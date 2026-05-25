@@ -22,6 +22,18 @@ export const updateProfile = async (req: any, res: Response) => {
 	res.json(user);
 };
 
+export const updateProfileController = async (req: any, res: Response) => {
+	const file = req.file;
+
+	const payload = {
+		...req.body,
+		profileImage: file ? `/uploads/${file.filename}` : undefined,
+	};
+
+	const user = await updateProfileService(req.user.userId, payload);
+
+	res.json(user);
+};
 /**
  * CHANGE PASSWORD
  */

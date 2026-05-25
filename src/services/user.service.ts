@@ -1,10 +1,17 @@
 import { User } from "../modules/user.model";
+import { Wallet } from "../modules/wallet.model";
 
-/**
- * GET CURRENT USER
- */
 export const getMeService = async (userId: string) => {
-	return User.findById(userId).populate("wallet");
+	const user = await User.findById(userId).lean();
+
+	if (!user) throw new Error("User not found");
+
+	const wallet = await Wallet.findOne({ user: userId });
+
+	return {
+		...user,
+		wallet,
+	};
 };
 
 /**

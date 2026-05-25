@@ -1,4 +1,20 @@
-import { model, models, Schema, Types } from "mongoose";
+import { model, models, Schema } from "mongoose";
+
+const otpSchema = new Schema(
+	{
+		code: String,
+		expiresAt: Date,
+	},
+	{ _id: false },
+);
+
+const resetSchema = new Schema(
+	{
+		code: String,
+		expiresAt: Date,
+	},
+	{ _id: false },
+);
 
 const userSchema = new Schema(
 	{
@@ -25,8 +41,9 @@ const userSchema = new Schema(
 		},
 
 		wallet: {
-			type: Types.ObjectId,
+			type: Schema.Types.ObjectId,
 			ref: "Wallet",
+			required: false,
 		},
 
 		stats: {
@@ -34,6 +51,9 @@ const userSchema = new Schema(
 			losses: { type: Number, default: 0 },
 			challenges: { type: Number, default: 0 },
 		},
+
+		otp: otpSchema,
+		resetPassword: resetSchema,
 
 		isSuspended: { type: Boolean, default: false },
 

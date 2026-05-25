@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { User } from "../modules/auth.model";
+import { User } from "../modules/user.model";
 import {
 	createToken,
 	generateOTPCode,

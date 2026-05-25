@@ -4,8 +4,9 @@ import { authMiddleware } from "../middlewares/auth.middleware";
 import {
 	changePassword,
 	getMe,
-	updateProfile,
+	updateProfileController,
 } from "../controllers/user.controller";
+import { upload } from "../middlewares/upload";
 
 const router = Router();
 
@@ -14,10 +15,12 @@ const router = Router();
  */
 router.get("/me", authMiddleware, getMe);
 
-/**
- * UPDATE PROFILE / ONBOARDING
- */
-router.put("/me", authMiddleware, updateProfile);
+router.put(
+	"/profile",
+	authMiddleware,
+	upload.single("profileImage"),
+	updateProfileController,
+);
 
 /**
  * CHANGE PASSWORD
