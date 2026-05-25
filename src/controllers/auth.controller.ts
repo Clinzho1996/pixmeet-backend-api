@@ -6,6 +6,7 @@ import {
 	hashPassword,
 	verifyPassword,
 } from "../services/auth.service";
+import { sendEmail } from "../services/email.service";
 
 /**
  * REGISTER
@@ -29,7 +30,17 @@ export const register = async (req: Request, res: Response) => {
 		},
 	});
 
-	console.log("OTP:", otp);
+	// 📧 SEND OTP EMAIL (REAL)
+	await sendEmail({
+		to: email,
+		subject: "Verify your PIXMEET account",
+		html: `
+			<h2>Welcome to PIXMEET</h2>
+			<p>Your verification code is:</p>
+			<h1>${otp}</h1>
+			<p>This code expires in 10 minutes.</p>
+		`,
+	});
 
 	res.json({
 		message: "Account created. Verify OTP sent to email.",
@@ -70,7 +81,7 @@ export const verifyEmail = async (req: Request, res: Response) => {
 };
 
 /**
- * LOGIN (FIXED FIRST LOGIN LOGIC)
+ * LOGIN
  */
 export const login = async (req: Request, res: Response) => {
 	const { email, password } = req.body;
@@ -90,7 +101,6 @@ export const login = async (req: Request, res: Response) => {
 	const isMatch = await verifyPassword(password, user.password);
 	if (!isMatch) throw new Error("Invalid credentials");
 
-	// FIX: determine first login BEFORE updating
 	const isFirstLogin = !user.lastLogin;
 
 	user.lastLogin = new Date();
@@ -116,7 +126,7 @@ export const login = async (req: Request, res: Response) => {
 export const forgotPassword = async (req: Request, res: Response) => {
 	const { email } = req.body;
 
-	const user = await User.findOne({ email });
+	const user: any = await User.findOne({ email });
 	if (!user) throw new Error("User not found");
 
 	const code = generateOTPCode();
@@ -128,13 +138,23 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
 	await user.save();
 
-	console.log("RESET OTP:", code);
+	// 📧 SEND RESET EMAIL
+	await sendEmail({
+		to: email,
+		subject: "PIXMEET Password Reset Code",
+		html: `
+			<h2>Password Reset Request</h2>
+			<p>Your reset code is:</p>
+			<h1>${code}</h1>
+			<p>This code expires in 10 minutes.</p>
+		`,
+	});
 
 	res.json({ message: "Reset OTP sent" });
 };
 
 /**
- * RESET PASSWORD (SAFE NULL CHECKS)
+ * RESET PASSWORD
  */
 export const resetPassword = async (req: Request, res: Response) => {
 	const { email, otp, newPassword } = req.body;
