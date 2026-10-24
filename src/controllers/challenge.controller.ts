@@ -64,10 +64,16 @@ export const listChallenges = async (req: any, res: Response) => {
 	return handle(
 		res,
 		async () => {
-			const status = req.query.status; // "live" | "waitlist" | undefined
-			const filter: any = {};
+			const { status } = req.query;
+			const filter: Record<string, any> = {};
 			if (typeof status === "string") filter.status = status;
-			return Challenge.find(filter).sort({ createdAt: -1 }).limit(50).lean();
+			return Challenge.find(filter)
+				.sort({ createdAt: -1 })
+				.limit(50)
+				.populate("creator", "profile.fullName email")
+				.populate("challengerA", "profile.fullName email")
+				.populate("challengerB", "profile.fullName email")
+				.lean();
 		},
 		200,
 		"listChallenges",
