@@ -122,3 +122,13 @@ export const listBanks = async (): Promise<
 		code: b.code,
 	}));
 };
+
+export const resolveAccount = async (
+	accountNumber: string,
+	bankCode: string,
+): Promise<{ account_name: string; account_number: string }> => {
+	const { data } = await paystackAxios.get("/bank/resolve", {
+		params: { account_number: accountNumber, bank_code: bankCode },
+	});
+	return data.data;
+};

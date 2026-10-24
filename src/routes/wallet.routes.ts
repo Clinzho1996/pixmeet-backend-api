@@ -5,6 +5,7 @@ import {
 	getTransactions,
 	getWallet,
 	paystackWebhook,
+	resolveBank,
 	setupSubaccount,
 	topup,
 	withdraw,
@@ -20,8 +21,9 @@ router.use(authMiddleware);
 router.get("/", getWallet);
 router.get("/transactions", getTransactions);
 router.post("/topup", topup);
-router.post("/subaccount", setupSubaccount);
 router.post("/withdraw", withdraw);
 router.get("/banks", getBanks);
+router.get("/banks/resolve", resolveBank);
+router.post("/subaccount", setupSubaccount);
 
 export default router;

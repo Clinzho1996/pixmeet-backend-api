@@ -7,8 +7,10 @@ import {
 	createTransferRecipient,
 	initializeTopup,
 	initiateTransfer,
+	resolveAccount,
 	verifyWebhookSignature,
 } from "../services/paystack.service";
+
 import {
 	creditBalance,
 	debitBalance,
@@ -63,7 +65,23 @@ export const topup = async (req: any, res: Response) => {
 	}
 };
 
-/* POST /wallet/subaccount  { bankCode, accountNumber, bankName } */
+export const resolveBank = async (req: any, res: Response) => {
+	try {
+		const { accountNumber, bankCode } = req.query;
+		if (!accountNumber || !bankCode) {
+			return res
+				.status(400)
+				.json({ message: "accountNumber and bankCode required" });
+		}
+		const data = await resolveAccount(String(accountNumber), String(bankCode));
+		res.json(data);
+	} catch (err: any) {
+		res.status(400).json({
+			message: err?.response?.data?.message ?? "Could not resolve account",
+		});
+	}
+};
+
 export const setupSubaccount = async (req: any, res: Response) => {
 	try {
 		const { bankCode, accountNumber, bankName } = req.body;
@@ -72,15 +90,35 @@ export const setupSubaccount = async (req: any, res: Response) => {
 				.status(400)
 				.json({ message: "bankCode and accountNumber are required" });
 		}
+
 		const user = await User.findById(req.user.userId);
 		const wallet = await ensureWallet(req.user.userId);
 
+		// Verify account with Paystack — returns account_name
+		let resolved: { account_name: string };
+		try {
+			resolved = await resolveAccount(accountNumber, bankCode);
+		} catch (err: any) {
+			return res.status(400).json({
+				message: err?.response?.data?.message ?? "Invalid account details",
+			});
+		}
+
+		// If subaccount already exists, just update the bank details
 		if (wallet.subaccountCode) {
-			return res.status(409).json({ message: "Subaccount already exists" });
+			wallet.bankAccountNumber = accountNumber;
+			wallet.bankCode = bankCode;
+			wallet.bankName = bankName;
+			wallet.accountName = resolved.account_name;
+			await wallet.save();
+			return res.json({
+				subaccountCode: wallet.subaccountCode,
+				accountName: resolved.account_name,
+			});
 		}
 
 		const sub = await createSubaccount({
-			businessName: user.profile?.fullName || user.email,
+			businessName: resolved.account_name,
 			bankCode,
 			accountNumber,
 			email: user.email,
@@ -91,9 +129,13 @@ export const setupSubaccount = async (req: any, res: Response) => {
 		wallet.bankAccountNumber = accountNumber;
 		wallet.bankCode = bankCode;
 		wallet.bankName = bankName;
+		wallet.accountName = resolved.account_name;
 		await wallet.save();
 
-		res.json({ subaccountCode: sub.subaccount_code });
+		res.json({
+			subaccountCode: sub.subaccount_code,
+			accountName: resolved.account_name,
+		});
 	} catch (err: any) {
 		console.error("[wallet.subaccount]", err?.response?.data ?? err);
 		res.status(500).json({ message: "Could not create subaccount" });
