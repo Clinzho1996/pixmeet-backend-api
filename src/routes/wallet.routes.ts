@@ -1,6 +1,7 @@
 // src/routes/wallet.route.ts
 import { Router } from "express";
 import {
+	getBanks,
 	getTransactions,
 	getWallet,
 	paystackWebhook,
@@ -21,5 +22,6 @@ router.get("/transactions", getTransactions);
 router.post("/topup", topup);
 router.post("/subaccount", setupSubaccount);
 router.post("/withdraw", withdraw);
+router.get("/banks", getBanks);
 
 export default router;

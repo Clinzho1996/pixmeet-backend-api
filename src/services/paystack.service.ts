@@ -109,3 +109,16 @@ export const verifyWebhookSignature = (
 		return false;
 	}
 };
+
+// src/services/paystack.service.ts — add
+export const listBanks = async (): Promise<
+	Array<{ name: string; code: string }>
+> => {
+	const { data } = await paystackAxios.get("/bank", {
+		params: { currency: "NGN", country: "nigeria" },
+	});
+	return (data.data as Array<{ name: string; code: string }>).map((b) => ({
+		name: b.name,
+		code: b.code,
+	}));
+};

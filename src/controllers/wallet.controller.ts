@@ -15,6 +15,18 @@ import {
 	ensureWallet,
 } from "../services/wallet.service";
 
+// src/controllers/wallet.controller.ts — add
+import { listBanks } from "../services/paystack.service";
+
+export const getBanks = async (_req: any, res: Response) => {
+	try {
+		const banks = await listBanks();
+		res.json(banks);
+	} catch (err: any) {
+		console.error("[wallet.getBanks]", err?.response?.data ?? err);
+		res.status(500).json({ message: "Could not load banks" });
+	}
+};
 export const getWallet = async (req: any, res: Response) => {
 	const wallet = await ensureWallet(req.user.userId);
 	res.json(wallet);
