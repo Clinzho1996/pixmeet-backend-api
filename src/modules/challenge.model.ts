@@ -1,4 +1,3 @@
-// src/modules/challenge.model.ts
 import mongoose, { Document, Schema } from "mongoose";
 
 export interface IChallenge extends Document {
@@ -17,6 +16,7 @@ export interface IChallenge extends Document {
 	videoB?: string;
 	votesA: number;
 	votesB: number;
+	winner?: mongoose.Types.ObjectId; // ← NEW
 	timeLeftEndsAt: Date;
 	isLocked: boolean;
 }
@@ -40,7 +40,7 @@ const challengeSchema = new Schema<IChallenge>(
 		entryFee: { type: Number, required: true, min: 0 },
 		title: { type: String, required: true },
 		description: { type: String, required: true },
-		image: { type: String }, // ← NEW
+		image: { type: String },
 		sound: {
 			name: { type: String, required: true },
 			by: { type: String, required: true },
@@ -50,6 +50,7 @@ const challengeSchema = new Schema<IChallenge>(
 		videoB: String,
 		votesA: { type: Number, default: 0 },
 		votesB: { type: Number, default: 0 },
+		winner: { type: Schema.Types.ObjectId, ref: "User" }, // ← NEW
 		timeLeftEndsAt: { type: Date, required: true },
 		isLocked: { type: Boolean, default: false },
 	},
