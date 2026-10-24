@@ -1,4 +1,5 @@
 import { Response } from "express";
+import { Challenge } from "../modules/challenge.model";
 import {
 	ChallengeError,
 	createChallengeService,
@@ -59,6 +60,19 @@ export const uploadVideo = async (req: any, res: Response) => {
 	);
 };
 
+export const listChallenges = async (req: any, res: Response) => {
+	return handle(
+		res,
+		async () => {
+			const status = req.query.status; // "live" | "waitlist" | undefined
+			const filter: any = {};
+			if (typeof status === "string") filter.status = status;
+			return Challenge.find(filter).sort({ createdAt: -1 }).limit(50).lean();
+		},
+		200,
+		"listChallenges",
+	);
+};
 /* ----------------------- VOTE ----------------------- */
 export const vote = async (req: any, res: Response) => {
 	return handle(

@@ -5,6 +5,7 @@ import {
 	getChallengeByMeetId,
 	getMyChallenges,
 	joinWaitlist,
+	listChallenges,
 	uploadVideo,
 	vote,
 } from "../controllers/challenge.controller";
@@ -12,6 +13,7 @@ import { authMiddleware } from "../middlewares/auth.middleware";
 
 const router = Router();
 
+router.get("/", listChallenges);
 /** POST /api/challenge — create */
 router.post("/", authMiddleware, createChallenge);
 
