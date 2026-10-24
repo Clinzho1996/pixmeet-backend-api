@@ -4,13 +4,13 @@ import helmet from "helmet";
 import morgan from "morgan";
 
 import path from "path";
-import authRoutes from "../src/routes/auth.route";
-import challengeRoutes from "../src/routes/challenge.route";
-import creatorRoutes from "../src/routes/creator.routes";
-import notificationRoutes from "../src/routes/notification.routes";
-import soundRoutes from "../src/routes/sound.routes";
-import userRoutes from "../src/routes/user.route";
-import walletRoutes from "../src/routes/wallet.routes";
+import authRoutes from "./routes/auth.route";
+import challengeRoutes from "./routes/challenge.route";
+import creatorRoutes from "./routes/creator.routes";
+import notificationRoutes from "./routes/notification.routes";
+import soundRoutes from "./routes/sound.routes";
+import userRoutes from "./routes/user.route";
+import walletRoutes from "./routes/wallet.routes";
 
 const app = express();
 
