@@ -14,6 +14,28 @@ import walletRoutes from "./routes/wallet.routes";
 
 const app = express();
 
+const allowedOrigins = [
+	"http://localhost:3000",
+	"http://localhost:3001",
+	"https://www.pixxmeet.com", // add your real deployed frontend origin
+];
+
+app.use(
+	cors({
+		origin: (origin, callback) => {
+			// Allow requests with no origin (curl, mobile apps, server-to-server)
+			if (!origin) return callback(null, true);
+			if (allowedOrigins.includes(origin)) return callback(null, true);
+			return callback(new Error(`Origin ${origin} not allowed by CORS`));
+		},
+		credentials: true, // if you're sending cookies; harmless if not
+		methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+		allowedHeaders: ["Content-Type", "Authorization"],
+	}),
+);
+
+app.options("*", cors());
+
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 app.use(cors());
