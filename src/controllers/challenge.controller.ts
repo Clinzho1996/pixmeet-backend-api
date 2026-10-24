@@ -1,5 +1,5 @@
+// src/controllers/challenge.controller.ts
 import { Response } from "express";
-import { Challenge } from "../modules/challenge.model";
 import {
 	ChallengeError,
 	createChallengeService,
@@ -7,6 +7,7 @@ import {
 	getChallengeByMeetIdService,
 	getMyChallengesService,
 	joinWaitlistService,
+	listChallengesService,
 	uploadVideoService,
 	voteService,
 } from "../services/challenge.service";
@@ -29,7 +30,6 @@ const handle = async (
 	}
 };
 
-/* ----------------------- CREATE ----------------------- */
 export const createChallenge = async (req: any, res: Response) => {
 	return handle(
 		res,
@@ -39,7 +39,6 @@ export const createChallenge = async (req: any, res: Response) => {
 	);
 };
 
-/* ----------------------- JOIN WAITLIST ----------------------- */
 export const joinWaitlist = async (req: any, res: Response) => {
 	return handle(
 		res,
@@ -49,7 +48,6 @@ export const joinWaitlist = async (req: any, res: Response) => {
 	);
 };
 
-/* ----------------------- UPLOAD VIDEO ----------------------- */
 export const uploadVideo = async (req: any, res: Response) => {
 	return handle(
 		res,
@@ -60,26 +58,6 @@ export const uploadVideo = async (req: any, res: Response) => {
 	);
 };
 
-export const listChallenges = async (req: any, res: Response) => {
-	return handle(
-		res,
-		async () => {
-			const { status } = req.query;
-			const filter: Record<string, any> = {};
-			if (typeof status === "string") filter.status = status;
-			return Challenge.find(filter)
-				.sort({ createdAt: -1 })
-				.limit(50)
-				.populate("creator", "profile.fullName email")
-				.populate("challengerA", "profile.fullName email")
-				.populate("challengerB", "profile.fullName email")
-				.lean();
-		},
-		200,
-		"listChallenges",
-	);
-};
-/* ----------------------- VOTE ----------------------- */
 export const vote = async (req: any, res: Response) => {
 	return handle(
 		res,
@@ -96,7 +74,6 @@ export const vote = async (req: any, res: Response) => {
 	);
 };
 
-/* ----------------------- GET MINE (NEW) ----------------------- */
 export const getMyChallenges = async (req: any, res: Response) => {
 	return handle(
 		res,
@@ -106,7 +83,6 @@ export const getMyChallenges = async (req: any, res: Response) => {
 	);
 };
 
-/* ----------------------- GET BY ID (NEW) ----------------------- */
 export const getChallengeById = async (req: any, res: Response) => {
 	return handle(
 		res,
@@ -116,12 +92,20 @@ export const getChallengeById = async (req: any, res: Response) => {
 	);
 };
 
-/* ----------------------- GET BY MEET ID (NEW) ----------------------- */
 export const getChallengeByMeetId = async (req: any, res: Response) => {
 	return handle(
 		res,
 		() => getChallengeByMeetIdService(req.params.meetId),
 		200,
 		"getChallengeByMeetId",
+	);
+};
+
+export const listChallenges = async (req: any, res: Response) => {
+	return handle(
+		res,
+		() => listChallengesService(req.query.status as string | undefined),
+		200,
+		"listChallenges",
 	);
 };

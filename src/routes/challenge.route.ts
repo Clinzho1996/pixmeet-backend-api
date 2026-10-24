@@ -1,3 +1,4 @@
+// src/routes/challenge.route.ts
 import { Router } from "express";
 import {
 	createChallenge,
@@ -13,26 +14,13 @@ import { authMiddleware } from "../middlewares/auth.middleware";
 
 const router = Router();
 
-router.get("/", listChallenges);
-/** POST /api/challenge — create */
-router.post("/", authMiddleware, createChallenge);
-
-/** GET /api/challenge/me — list my challenges */
+router.get("/", authMiddleware, listChallenges);
 router.get("/me", authMiddleware, getMyChallenges);
-
-/** GET /api/challenge/meet/:meetId — resolve meetId → challenge */
 router.get("/meet/:meetId", authMiddleware, getChallengeByMeetId);
-
-/** GET /api/challenge/:id — fetch one */
 router.get("/:id", authMiddleware, getChallengeById);
-
-/** POST /api/challenge/join-waitlist */
+router.post("/", authMiddleware, createChallenge);
 router.post("/join-waitlist", authMiddleware, joinWaitlist);
-
-/** POST /api/challenge/upload-video */
 router.post("/upload-video", authMiddleware, uploadVideo);
-
-/** POST /api/challenge/vote */
 router.post("/vote", authMiddleware, vote);
 
 export default router;
