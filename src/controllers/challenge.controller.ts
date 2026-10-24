@@ -1,54 +1,107 @@
 import { Response } from "express";
 import {
+	ChallengeError,
 	createChallengeService,
+	getChallengeByIdService,
+	getChallengeByMeetIdService,
+	getMyChallengesService,
 	joinWaitlistService,
 	uploadVideoService,
 	voteService,
 } from "../services/challenge.service";
 
-/**
- * CREATE CHALLENGE
- */
+const handle = async (
+	res: Response,
+	fn: () => Promise<unknown>,
+	successStatus = 200,
+	context = "challenge",
+) => {
+	try {
+		const result = await fn();
+		return res.status(successStatus).json(result);
+	} catch (err) {
+		if (err instanceof ChallengeError) {
+			return res.status(err.status).json({ message: err.message });
+		}
+		console.error(`[challenge.${context}]`, err);
+		return res.status(500).json({ message: "Something went wrong" });
+	}
+};
+
+/* ----------------------- CREATE ----------------------- */
 export const createChallenge = async (req: any, res: Response) => {
-	const challenge = await createChallengeService(req.user.userId, req.body);
-
-	res.json(challenge);
+	return handle(
+		res,
+		() => createChallengeService(req.user.userId, req.body),
+		201,
+		"create",
+	);
 };
 
-/**
- * JOIN WAITLIST
- */
+/* ----------------------- JOIN WAITLIST ----------------------- */
 export const joinWaitlist = async (req: any, res: Response) => {
-	const challenge = await joinWaitlistService(
-		req.user.userId,
-		req.body.challengeId,
+	return handle(
+		res,
+		() => joinWaitlistService(req.user.userId, req.body?.challengeId),
+		200,
+		"joinWaitlist",
 	);
-
-	res.json(challenge);
 };
 
-/**
- * UPLOAD VIDEO
- */
+/* ----------------------- UPLOAD VIDEO ----------------------- */
 export const uploadVideo = async (req: any, res: Response) => {
-	const challenge = await uploadVideoService(
-		req.user.userId,
-		req.body.meetId,
-		req.body.videoUrl,
+	return handle(
+		res,
+		() =>
+			uploadVideoService(req.user.userId, req.body?.meetId, req.body?.videoUrl),
+		200,
+		"uploadVideo",
 	);
-
-	res.json(challenge);
 };
 
-/**
- * VOTE
- */
+/* ----------------------- VOTE ----------------------- */
 export const vote = async (req: any, res: Response) => {
-	const challenge = await voteService(
-		req.user.userId,
-		req.body.challengeId,
-		req.body.side,
+	return handle(
+		res,
+		async () => {
+			const challenge = await voteService(
+				req.user.userId,
+				req.body?.challengeId,
+				req.body?.side,
+			);
+			return { success: true, challenge };
+		},
+		200,
+		"vote",
 	);
+};
 
-	res.json({ success: true, challenge });
+/* ----------------------- GET MINE (NEW) ----------------------- */
+export const getMyChallenges = async (req: any, res: Response) => {
+	return handle(
+		res,
+		() => getMyChallengesService(req.user.userId),
+		200,
+		"getMyChallenges",
+	);
+};
+
+/* ----------------------- GET BY ID (NEW) ----------------------- */
+export const getChallengeById = async (req: any, res: Response) => {
+	return handle(
+		res,
+		() => getChallengeByIdService(req.params.id),
+		200,
+		"getChallengeById",
+	);
+};
+
+/* ----------------------- GET BY MEET ID (NEW) ----------------------- */
+export const getChallengeByMeetId = async (req: any, res: Response) => {
+	return handle(
+		res,
+		() => getChallengeByMeetIdService(req.params.meetId),
+		200,
+		"getChallengeByMeetId",
+	);
 };
