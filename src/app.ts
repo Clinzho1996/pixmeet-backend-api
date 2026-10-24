@@ -39,6 +39,16 @@ app.use(
 // Let cors() handle preflights for every route
 app.options("*", cors());
 
+app.post(
+	"/api/wallet/webhook",
+	express.raw({ type: "application/json" }),
+	(req: any, _res, next) => {
+		req.rawBody = req.body; // Buffer
+		req.body = JSON.parse(req.body.toString()); // parsed for the handler
+		next();
+	},
+);
+
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // app.use(cors());  ← DELETE THIS LINE

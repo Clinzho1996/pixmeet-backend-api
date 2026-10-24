@@ -1,6 +1,50 @@
 import mongoose from "mongoose";
 import { Transaction } from "../modules/transaction.model";
 import { Wallet } from "../modules/wallet.model";
+// src/services/wallet.service.ts — add these alongside existing creditCoins/debitCoins
+
+/* CREDIT FIAT BALANCE (from top-up webhook) */
+export const creditBalance = async (
+	userId: string,
+	amountNaira: number,
+	reference: string,
+) => {
+	const wallet = await Wallet.findOneAndUpdate(
+		{ user: userId },
+		{ $inc: { balance: amountNaira } },
+		{ new: true, upsert: true },
+	);
+	await Transaction.create({
+		user: userId,
+		type: "credit",
+		amount: amountNaira,
+		reason: "topup",
+		reference,
+	});
+	return wallet;
+};
+
+/* DEBIT FIAT BALANCE (before initiating withdrawal) */
+export const debitBalance = async (
+	userId: string,
+	amountNaira: number,
+	reference: string,
+) => {
+	const wallet = await Wallet.findOne({ user: userId });
+	if (!wallet || wallet.balance < amountNaira) {
+		throw new Error("Insufficient balance");
+	}
+	wallet.balance -= amountNaira;
+	await wallet.save();
+	await Transaction.create({
+		user: userId,
+		type: "debit",
+		amount: amountNaira,
+		reason: "withdrawal",
+		reference,
+	});
+	return wallet;
+};
 
 /**
  * ENSURE WALLET EXISTS (ATOMIC SAFE)
