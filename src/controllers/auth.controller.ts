@@ -8,176 +8,286 @@ import {
 } from "../services/auth.service";
 import { sendEmail } from "../services/email.service";
 
-/**
- * REGISTER
- */
+/* -------------------------------------------------------------------------- */
+/*                                   Helpers                                  */
+/* -------------------------------------------------------------------------- */
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Normalize emails so "User@X.com" and "user@x.com" map to the same account */
+const normalizeEmail = (email: unknown): string => {
+	if (typeof email !== "string") return "";
+	return email.trim().toLowerCase();
+};
+
+/** Small helper — sends a 500 and logs the underlying error, without leaking it */
+const serverError = (res: Response, err: unknown, context: string) => {
+	console.error(`[auth.${context}]`, err);
+	return res.status(500).json({ message: "Something went wrong" });
+};
+
+/* -------------------------------------------------------------------------- */
+/*                                  REGISTER                                  */
+/* -------------------------------------------------------------------------- */
+
 export const register = async (req: Request, res: Response) => {
-	const { email, password } = req.body;
+	try {
+		const email = normalizeEmail(req.body?.email);
+		const password = req.body?.password;
 
-	const existing = await User.findOne({ email });
-	if (existing) throw new Error("User already exists");
+		if (!email || !EMAIL_REGEX.test(email)) {
+			return res.status(400).json({ message: "Please provide a valid email" });
+		}
+		if (typeof password !== "string" || password.length < 8) {
+			return res
+				.status(400)
+				.json({ message: "Password must be at least 8 characters" });
+		}
 
-	const otp = generateOTPCode();
+		const existing = await User.findOne({ email });
+		if (existing) {
+			return res.status(409).json({ message: "User already exists" });
+		}
 
-	await User.create({
-		email,
-		password: await hashPassword(password),
-		isVerified: false,
-		profileCompleted: false,
-		otp: {
-			code: otp,
-			expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-		},
-	});
+		const otp = generateOTPCode();
 
-	// 📧 SEND OTP EMAIL (REAL)
-	await sendEmail({
-		to: email,
-		subject: "Verify your PIXMEET account",
-		html: `
-			<h2>Welcome to PIXMEET</h2>
-			<p>Your verification code is:</p>
-			<h1>${otp}</h1>
-			<p>This code expires in 10 minutes.</p>
-		`,
-	});
+		await User.create({
+			email,
+			password: await hashPassword(password),
+			isVerified: false,
+			profileCompleted: false,
+			otp: {
+				code: otp,
+				expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+			},
+		});
 
-	res.json({
-		message: "Account created. Verify OTP sent to email.",
-	});
+		// Fire-and-forget: SMTP failures shouldn't kill the request
+		sendEmail({
+			to: email,
+			subject: "Verify your PIXMEET account",
+			html: `
+        <h2>Welcome to PIXMEET</h2>
+        <p>Your verification code is:</p>
+        <h1>${otp}</h1>
+        <p>This code expires in 10 minutes.</p>
+      `,
+		}).catch((err) => console.error("[auth.register] email send failed:", err));
+
+		return res.status(201).json({
+			message: "Account created. Verify OTP sent to email.",
+		});
+	} catch (err) {
+		return serverError(res, err, "register");
+	}
 };
 
-/**
- * VERIFY EMAIL
- */
+/* -------------------------------------------------------------------------- */
+/*                                VERIFY EMAIL                                */
+/* -------------------------------------------------------------------------- */
+
 export const verifyEmail = async (req: Request, res: Response) => {
-	const { email, otp } = req.body;
+	try {
+		const email = normalizeEmail(req.body?.email);
+		const otp = req.body?.otp;
 
-	const user: any = await User.findOne({ email });
-	if (!user) throw new Error("User not found");
+		if (!email || !EMAIL_REGEX.test(email)) {
+			return res.status(400).json({ message: "Please provide a valid email" });
+		}
+		if (typeof otp !== "string" || otp.length !== 6) {
+			return res
+				.status(400)
+				.json({ message: "Please provide the 6-digit OTP" });
+		}
 
-	if (user.isVerified) {
-		return res.json({ message: "Already verified" });
+		const user: any = await User.findOne({ email });
+		if (!user) {
+			return res.status(404).json({ message: "User not found" });
+		}
+
+		if (user.isVerified) {
+			return res.status(200).json({ message: "Already verified" });
+		}
+
+		if (!user.otp?.code) {
+			return res.status(400).json({ message: "No OTP on file" });
+		}
+
+		if (user.otp.code !== otp) {
+			return res.status(400).json({ message: "Invalid OTP" });
+		}
+
+		if (new Date() > user.otp.expiresAt) {
+			return res.status(410).json({ message: "OTP expired" });
+		}
+
+		user.isVerified = true;
+		user.otp = undefined;
+		await user.save();
+
+		return res.status(200).json({ message: "Email verified successfully" });
+	} catch (err) {
+		return serverError(res, err, "verifyEmail");
 	}
-
-	if (!user.otp?.code) {
-		throw new Error("OTP not found");
-	}
-
-	if (user.otp.code !== otp) {
-		throw new Error("Invalid OTP");
-	}
-
-	if (new Date() > user.otp.expiresAt) {
-		throw new Error("OTP expired");
-	}
-
-	user.isVerified = true;
-	user.otp = undefined;
-
-	await user.save();
-
-	res.json({ message: "Email verified successfully" });
 };
 
-/**
- * LOGIN
- */
+/* -------------------------------------------------------------------------- */
+/*                                   LOGIN                                    */
+/* -------------------------------------------------------------------------- */
+
 export const login = async (req: Request, res: Response) => {
-	const { email, password } = req.body;
+	try {
+		const email = normalizeEmail(req.body?.email);
+		const password = req.body?.password;
 
-	const user: any = await User.findOne({ email }).select("+password");
+		if (!email || !password) {
+			return res
+				.status(400)
+				.json({ message: "Email and password are required" });
+		}
 
-	if (!user) throw new Error("User not found");
+		const user: any = await User.findOne({ email }).select("+password");
+		if (!user) {
+			// Same message as wrong-password — prevents user enumeration
+			return res.status(401).json({ message: "Invalid email or password" });
+		}
 
-	if (user.isSuspended) {
-		throw new Error("Account suspended");
+		if (user.isSuspended) {
+			return res.status(403).json({ message: "Account suspended" });
+		}
+
+		if (!user.isVerified) {
+			return res.status(403).json({ message: "Email not verified" });
+		}
+
+		const isMatch = await verifyPassword(password, user.password);
+		if (!isMatch) {
+			return res.status(401).json({ message: "Invalid email or password" });
+		}
+
+		const isFirstLogin = !user.lastLogin;
+		user.lastLogin = new Date();
+		await user.save();
+
+		const token = createToken(user);
+
+		return res.status(200).json({
+			token,
+			user: {
+				id: user._id,
+				email: user.email,
+				role: user.role,
+				profileCompleted: user.profileCompleted,
+			},
+			isFirstLogin,
+		});
+	} catch (err) {
+		return serverError(res, err, "login");
 	}
-
-	if (!user.isVerified) {
-		throw new Error("Email not verified");
-	}
-
-	const isMatch = await verifyPassword(password, user.password);
-	if (!isMatch) throw new Error("Invalid credentials");
-
-	const isFirstLogin = !user.lastLogin;
-
-	user.lastLogin = new Date();
-	await user.save();
-
-	const token = createToken(user);
-
-	res.json({
-		token,
-		user: {
-			id: user._id,
-			email: user.email,
-			role: user.role,
-			profileCompleted: user.profileCompleted,
-		},
-		isFirstLogin,
-	});
 };
 
-/**
- * FORGOT PASSWORD
- */
+/* -------------------------------------------------------------------------- */
+/*                              FORGOT PASSWORD                               */
+/* -------------------------------------------------------------------------- */
+
 export const forgotPassword = async (req: Request, res: Response) => {
-	const { email } = req.body;
+	try {
+		const email = normalizeEmail(req.body?.email);
 
-	const user: any = await User.findOne({ email });
-	if (!user) throw new Error("User not found");
+		if (!email || !EMAIL_REGEX.test(email)) {
+			return res.status(400).json({ message: "Please provide a valid email" });
+		}
 
-	const code = generateOTPCode();
+		// Always return success for this endpoint so attackers can't
+		// enumerate emails by hitting /forgot-password
+		const user: any = await User.findOne({ email });
+		if (!user) {
+			return res.status(200).json({ message: "Reset OTP sent" });
+		}
 
-	user.resetPassword = {
-		code,
-		expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-	};
+		// 10-minute cooldown between reset requests
+		if (
+			user.resetPassword?.expiresAt &&
+			user.resetPassword.expiresAt.getTime() - Date.now() > 9 * 60 * 1000
+		) {
+			return res
+				.status(429)
+				.json({ message: "Please wait before requesting another code" });
+		}
 
-	await user.save();
+		const code = generateOTPCode();
+		user.resetPassword = {
+			code,
+			expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+		};
+		await user.save();
 
-	// 📧 SEND RESET EMAIL
-	await sendEmail({
-		to: email,
-		subject: "PIXMEET Password Reset Code",
-		html: `
-			<h2>Password Reset Request</h2>
-			<p>Your reset code is:</p>
-			<h1>${code}</h1>
-			<p>This code expires in 10 minutes.</p>
-		`,
-	});
+		sendEmail({
+			to: email,
+			subject: "PIXMEET Password Reset Code",
+			html: `
+        <h2>Password Reset Request</h2>
+        <p>Your reset code is:</p>
+        <h1>${code}</h1>
+        <p>This code expires in 10 minutes.</p>
+      `,
+		}).catch((err) =>
+			console.error("[auth.forgotPassword] email send failed:", err),
+		);
 
-	res.json({ message: "Reset OTP sent" });
+		return res.status(200).json({ message: "Reset OTP sent" });
+	} catch (err) {
+		return serverError(res, err, "forgotPassword");
+	}
 };
 
-/**
- * RESET PASSWORD
- */
+/* -------------------------------------------------------------------------- */
+/*                               RESET PASSWORD                               */
+/* -------------------------------------------------------------------------- */
+
 export const resetPassword = async (req: Request, res: Response) => {
-	const { email, otp, newPassword } = req.body;
+	try {
+		const email = normalizeEmail(req.body?.email);
+		const otp = req.body?.otp;
+		const newPassword = req.body?.newPassword;
 
-	const user: any = await User.findOne({ email }).select("+password");
-	if (!user) throw new Error("User not found");
+		if (!email || !EMAIL_REGEX.test(email)) {
+			return res.status(400).json({ message: "Please provide a valid email" });
+		}
+		if (typeof otp !== "string" || otp.length !== 6) {
+			return res
+				.status(400)
+				.json({ message: "Please provide the 6-digit OTP" });
+		}
+		if (typeof newPassword !== "string" || newPassword.length < 8) {
+			return res
+				.status(400)
+				.json({ message: "Password must be at least 8 characters" });
+		}
 
-	if (!user.resetPassword?.code) {
-		throw new Error("Reset OTP not found");
+		const user: any = await User.findOne({ email }).select("+password");
+		if (!user) {
+			return res.status(404).json({ message: "User not found" });
+		}
+
+		if (!user.resetPassword?.code) {
+			return res.status(400).json({ message: "No reset request on file" });
+		}
+
+		if (user.resetPassword.code !== otp) {
+			return res.status(400).json({ message: "Invalid reset OTP" });
+		}
+
+		if (new Date() > user.resetPassword.expiresAt) {
+			return res.status(410).json({ message: "OTP expired" });
+		}
+
+		user.password = await hashPassword(newPassword);
+		user.resetPassword = undefined;
+		await user.save();
+
+		return res.status(200).json({ message: "Password reset successful" });
+	} catch (err) {
+		return serverError(res, err, "resetPassword");
 	}
-
-	if (user.resetPassword.code !== otp) {
-		throw new Error("Invalid reset OTP");
-	}
-
-	if (new Date() > user.resetPassword.expiresAt) {
-		throw new Error("OTP expired");
-	}
-
-	user.password = await hashPassword(newPassword);
-	user.resetPassword = undefined;
-
-	await user.save();
-
-	res.json({ message: "Password reset successful" });
 };

@@ -17,29 +17,32 @@ const app = express();
 const allowedOrigins = [
 	"http://localhost:3000",
 	"http://localhost:3001",
-	"https://www.pixxmeet.com", // add your real deployed frontend origin
-];
+	"https://www.pixxmeet.com",
+	"https://pixxmeet.com",
+	process.env.FRONTEND_URL, // pull from env so prod URL isn't hardcoded
+].filter(Boolean) as string[];
 
 app.use(
 	cors({
 		origin: (origin, callback) => {
-			// Allow requests with no origin (curl, mobile apps, server-to-server)
+			// Allow non-browser requests (curl, Postman, mobile)
 			if (!origin) return callback(null, true);
 			if (allowedOrigins.includes(origin)) return callback(null, true);
 			return callback(new Error(`Origin ${origin} not allowed by CORS`));
 		},
-		credentials: true, // if you're sending cookies; harmless if not
+		credentials: true,
 		methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 		allowedHeaders: ["Content-Type", "Authorization"],
 	}),
 );
 
+// Let cors() handle preflights for every route
 app.options("*", cors());
 
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-app.use(cors());
-app.use(helmet());
+// app.use(cors());  ← DELETE THIS LINE
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(morgan("dev"));
 app.use(express.json());
 
@@ -50,5 +53,17 @@ app.use("/api/wallet", walletRoutes);
 app.use("/api/notification", notificationRoutes);
 app.use("/api/creator", creatorRoutes);
 app.use("/api/sounds", soundRoutes);
+
+// Health check
+app.get("/health", (_req, res) => {
+	res.status(200).json({ ok: true, ts: Date.now() });
+});
+
+// JSON error handler — MUST be last, after all routes
+app.use((err: any, _req: any, res: any, next: any) => {
+	console.error("[express.error]", err);
+	if (res.headersSent) return next(err);
+	res.status(500).json({ message: "Internal server error" });
+});
 
 export default app;
