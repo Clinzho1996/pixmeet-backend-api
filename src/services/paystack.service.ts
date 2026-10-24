@@ -3,7 +3,7 @@ import axios from "axios";
 import crypto from "crypto";
 
 const PAYSTACK_BASE = "https://api.paystack.co";
-const SECRET = process.env.PAYSTACK_SECRET_KEY!;
+const SECRET = process.env.PAYSTACK_SECRET!;
 
 const paystackAxios = axios.create({
 	baseURL: PAYSTACK_BASE,
